@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshState, restoreState, canCollect, sell, buy, capacity, haulRewards, contractFor, contractProgress } from './engine.js';
+import { freshState, restoreState, canCollect, sell, buy, capacity, haulRewards, contractFor, contractProgress, YARDS, yardFor, recoverWreck, nextYard, TYPES, UPGRADES } from './engine.js';
 
 test('complete collect, sell, upgrade loop unlocks heavy scrap', () => {
   const state = freshState(), cargo = [];
@@ -38,7 +38,7 @@ test('jobs require matching cargo in one haul; completed jobs survive reload', (
   assert.equal(contractFor(state).name, 'Clean sweep');
 });
 test('mixed cargo respects weight, and upgrades cannot exceed maximum', () => {
-  const state = freshState(); state.credits = 1000;
+  const state = freshState(); state.credits = 5000;
   assert.ok(buy(state, 'power'));
   const cargo = [{ type: 2 }, { type: 2 }, { type: 1 }, { type: 0 }];
   assert.equal(canCollect(state, cargo, { type: 1 }), false);
@@ -46,6 +46,42 @@ test('mixed cargo respects weight, and upgrades cannot exceed maximum', () => {
   for (let i = 0; i < 3; i++) assert.ok(buy(state, 'capacity'));
   assert.equal(capacity(state), 60); const balance = state.credits;
   assert.equal(buy(state, 'capacity'), false); assert.equal(state.credits, balance);
+});
+
+test('wreck recovery pays once, unlocks travel, and preserves equipment', () => {
+  const state = freshState(); state.upgrades.power = 2;
+  assert.equal(nextYard(state), false); assert.equal(recoverWreck(state), false);
+  state.yardCleared = yardFor(state).target;
+  assert.ok(recoverWreck(state)); assert.equal(state.credits, 100);
+  assert.equal(recoverWreck(state), false); assert.equal(state.credits, 100);
+  const restored = restoreState(JSON.parse(JSON.stringify(state)));
+  assert.ok(nextYard(restored)); assert.equal(restored.yard, 1);
+  assert.equal(restored.upgrades.power, 2); assert.equal(restored.yardCleared, 0); assert.equal(restored.recovered, false);
+  restored.yard = 2; restored.yardCleared = YARDS[2].target; assert.ok(recoverWreck(restored));
+  assert.ok(nextYard(restored)); assert.equal(restored.yard, 0);
+});
+
+test('later upgrades require several full hauls and unlock new salvage', () => {
+  const state = freshState(); state.credits = 20;
+  buy(state, 'power'); assert.equal(canCollect(state, [], { type: 3 }), false);
+  state.credits = UPGRADES.power.costs[1]; buy(state, 'power');
+  assert.ok(canCollect(state, [], { type: 3 })); assert.equal(canCollect(state, [], { type: 4 }), false);
+  state.credits = UPGRADES.power.costs[2]; buy(state, 'power'); assert.ok(canCollect(state, [], { type: 4 }));
+  assert.ok(UPGRADES.power.costs[2] > 10 * 48);
+});
+
+test('rotating contracts fit cargo and only request accessible local materials', () => {
+  for (let yard = 0; yard < YARDS.length; yard++) for (let power = 0; power <= 3; power++) for (let contracts = 3; contracts < 20; contracts++) {
+    const state = freshState(); Object.assign(state, { yard, contracts }); state.upgrades.power = power;
+    const job = contractFor(state);
+    assert.ok(job.count <= capacity(state));
+    if (job.type !== null) {
+      assert.ok(yardFor(state).materials.includes(job.type)); assert.ok(TYPES[job.type].power <= power + 1);
+      assert.ok(job.count * TYPES[job.type].weight <= capacity(state));
+    }
+  }
+  const restored = restoreState({ yard: 500, yardCleared: 9999, recovered: true });
+  assert.equal(restored.yard, 2); assert.equal(restored.yardCleared, 150);
 });
 test('saved progress round-trips and malformed saves cannot break progression', () => {
   const state = freshState(); state.credits = 87; state.parts = 3; state.sold = 51; state.upgrades.range = 2;

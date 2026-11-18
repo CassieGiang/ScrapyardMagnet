@@ -26,6 +26,9 @@ If PowerShell blocks `npm.ps1`, use `node server.js` directly or `npm.cmd start`
 
 ## Controls
 
+- Explore three finite yards: North yard, Rail depot, and Reactor ruins. Scrap stays cleared. Bank enough pieces to expose each yard's wreck, then hold your magnet over its center for 2.5 seconds to recover it and claim the cash reward. Sell any remaining cargo before travelling.
+- Travel preserves credits, workshop upgrades, and Rusty's parts. Yard progress saves when cargo is sold; unbanked cargo is returned to the pile on reload. After the third wreck, the route can be replayed.
+- Motors require pull power level 3; reactor cores require level 4. Later upgrades cost more, while the first purchases remain affordable. Existing saves keep their purchased upgrades.
 - Salvage jobs pay bonus cash for bringing the requested cargo in a single haul. The first six-piece delivery pays at least $38, enough for the first power upgrade.
 - Bring 6 pieces for a 1.5× scrap payout, or 10 for 2×. Job bonuses are added after the multiplier.
 - The first power upgrade unlocks Magnetic Blast: press E or the Blast button to pull from a much larger area for a short burst. It recharges in seven seconds; higher power levels strengthen it.
@@ -45,7 +48,7 @@ Credits, upgrades, and restored parts save automatically in this browser. Cargo 
 node --test
 ```
 
-Tests cover the collection/selling/upgrade loop, job rewards, cargo weight limits, heavy-scrap unlocking, upgrade limits, saved-state migration, and simulated game frames for the first haul and blast cooldown. Frame tests use a minimal DOM/canvas stub; they do not replace a visual browser playtest.
+Tests cover the collection/selling/upgrade loop, job rewards, cargo weight limits, salvage unlocking, upgrade limits, saved-state migration, wreck recovery, travel, and simulated game frames for the first haul and blast cooldown. Frame tests use a minimal DOM/canvas stub; they do not replace a visual browser playtest.
 
 ## Scope
 

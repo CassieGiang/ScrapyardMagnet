@@ -1,4 +1,4 @@
-import { TYPES, UPGRADES, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js?v=2';
+import { TYPES, UPGRADES, YARDS, yardFor, recoverWreck, nextYard, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js?v=4';
 
 const $ = id => document.getElementById(id);
 const canvas = $('yard'), ctx = canvas.getContext('2d');
@@ -8,10 +8,11 @@ let state = freshState(), storageOK = true;
 try { state = restoreState(JSON.parse(localStorage.getItem(SAVE))); } catch { storageOK = false; }
 let cargo = [], scrap = [], particles = [], labels = [], keys = new Set();
 let magnet = { x: 500, y: 525 }, target = { ...magnet }, pulling = false, paused = false;
-let sound = false, audio, lastTime = 0, clock = 0, spawnTime = 0, toastUntil = 6, fullWarn = 0;
+let sound = false, audio, lastTime = 0, clock = 0, toastUntil = 6, fullWarn = 0;
 let part = null, victoryTime = 0;
 let blastUntil = 0, blastReady = 0, shake = 0, lastPickup = -5, streak = 0;
 let nextPickupAt = 0;
+let wreckCharge = 0;
 const robotShapes = [
   '<rect x="99" y="74" width="62" height="47" rx="9"/><rect x="112" y="85" width="36" height="20" rx="4"/>',
   '<rect x="104" y="34" width="52" height="36" rx="10"/><path d="M130 34V20"/><circle cx="130" cy="17" r="4"/><circle cx="118" cy="50" r="3" fill="#152127"/><circle cx="142" cy="50" r="3" fill="#152127"/><path d="M120 59H140"/>',
@@ -39,13 +40,15 @@ function tone(freq = 500, duration = .06, volume = .035) {
   } catch { sound = false; $('sound').textContent = 'Sound unavailable'; $('sound').setAttribute('aria-pressed', 'false'); }
 }
 function spawn() {
-  const type = Math.random() < .22 ? 1 : Math.random() < .12 ? 2 : 0;
+  const materials = yardFor(state).materials;
+  const type = materials[Math.floor(Math.random() * materials.length)];
   scrap.push({ x: 70 + Math.random() * 860, y: 85 + Math.random() * 390, vx: 0, vy: 0, type, angle: Math.random() * Math.PI * 2, shape: Math.floor(Math.random() * 3) });
 }
 function populate() {
-  scrap = []; for (let i = 0; i < 155; i++) spawn();
+  scrap = []; const starter = state.yard === 0 && state.yardCleared === 0 ? 12 : 0;
+  for (let i = 0; i < yardFor(state).count - state.yardCleared - starter; i++) spawn();
   // An immediate first cluster lets players feel a full haul before crossing the yard.
-  for (let i = 0; i < 12; i++) scrap.push({ x: 440 + i % 4 * 38, y: 420 + Math.floor(i / 4) * 30, vx: 0, vy: 0, type: 0, angle: i, shape: i % 3 });
+  for (let i = 0; i < starter; i++) scrap.push({ x: 440 + i % 4 * 38, y: 420 + Math.floor(i / 4) * 30, vx: 0, vy: 0, type: 0, angle: i, shape: i % 3 });
 }
 function fieldRadius() { return [110, 160, 215, 275][state.upgrades.range]; }
 function blast() {
@@ -60,6 +63,13 @@ function refreshBlast() {
   $('blast').textContent = !state.upgrades.power ? 'ϟ Blast · unlock power' : wait ? `ϟ Recharging · ${wait}s` : 'ϟ BLAST READY · E';
 }
 function refresh() {
+  const yard = yardFor(state);
+  $('yard-name').textContent = yard.name.toUpperCase();
+  $('expedition-title').textContent = yard.title;
+  $('expedition-progress').textContent = state.recovered ? `Recovered! +$${yard.reward} paid. ${state.yard === YARDS.length - 1 ? 'All three yards explored.' : 'Next yard unlocked.'}` : state.yardCleared >= yard.target ? 'Wreck exposed! Hold your magnet over its center to recover it.' : `Sell ${yard.target - state.yardCleared} more pieces to expose the wreck. Recovery pays $${yard.reward}.`;
+  $('yard-fill').style.width = Math.min(100, state.yardCleared / yard.target * 100) + '%';
+  $('next-yard').hidden = !state.recovered;
+  $('next-yard').textContent = state.yard === YARDS.length - 1 ? 'Expedition complete · revisit North yard ↻' : 'Travel to ' + YARDS[state.yard + 1].name + ' →';
   $('credits').textContent = '$' + state.credits;
   $('cargo').textContent = `${cargoWeight(cargo)} / ${capacity(state)} kg`;
   $('cargo-fill').style.width = `${cargoWeight(cargo) / capacity(state) * 100}%`;
@@ -79,8 +89,15 @@ function refresh() {
   }
   $('parts').textContent = state.parts + ' / 5'; $('robot-fill').style.width = state.parts * 20 + '%';
   $('robot-parts').innerHTML = robotShapes.map((shape, i) => `<g fill="${i < state.parts ? '#b8dfb5' : '#27353b'}" stroke="${i < state.parts ? '#b8dfb5' : '#53636a'}" stroke-width="2">${shape}</g>`).join('');
-  if (state.parts === 5) $('robot-copy').innerHTML = 'Rusty is back on his feet. Thanks to you.<br>Keep salvaging and max out your workshop.';
+  if (state.parts === 5) $('robot-copy').innerHTML = 'Rusty is back on his feet. Thanks to you.<br>Take him along on your salvage expedition.';
 }
+$('next-yard').onclick = () => {
+  if (cargo.length) { toast('Sell your cargo before travelling. Your upgrades come with you.'); return; }
+  if (nextYard(state)) {
+    part = null; wreckCharge = 0; particles = []; labels = []; magnet = { x: 500, y: 525 }; target = { ...magnet };
+    populate(); refresh(); save(); toast(`${yardFor(state).name}: a new wreck, new salvage. Your workshop travels with you.`, 5);
+  }
+};
 for (const key of Object.keys(UPGRADES)) {
   const button = document.createElement('button'); button.className = 'upgrade'; button.id = 'upgrade-' + key;
     button.addEventListener('click', () => { if (buy(state, key)) { tone(750, .15); shake = 5; toast(key === 'power' && state.upgrades.power === 1 ? 'MAGNETIC BLAST UNLOCKED! Press E or the Blast button.' : UPGRADES[key].name + ' upgraded. Try your new magnet.'); refresh(); save(); } });
@@ -94,7 +111,7 @@ $('reset').onclick = () => { setPause(true); $('reset-dialog').showModal(); };
 $('reset-dialog').addEventListener('close', () => {
   if ($('reset-dialog').returnValue === 'reset') {
     state = freshState(); cargo = []; particles = []; labels = []; part = null; victoryTime = 0; magnet = { x: 500, y: 525 }; target = { ...magnet };
-    blastUntil = 0; blastReady = 0; shake = 0; streak = 0; lastPickup = -5; nextPickupAt = 0;
+    blastUntil = 0; blastReady = 0; shake = 0; streak = 0; lastPickup = -5; nextPickupAt = 0; wreckCharge = 0;
     $('robot-copy').innerHTML = 'Five lost parts. One second chance.<br>Find glowing parts buried in the scrap.';
     populate(); refresh(); save(); toast('Fresh yard. Fresh possibilities.');
   }
@@ -148,7 +165,7 @@ function update(dt) {
         refresh(); continue;
       }
     } else if (active && distance < 45 && clock > fullWarn) {
-      toast(TYPES[item.type].power > state.upgrades.power + 1 ? 'Heavy engine. Upgrade pull power in the workshop.' : 'Cargo full. Bring your haul to the sell bay below.'); fullWarn = clock + 5;
+      toast(TYPES[item.type].power > state.upgrades.power + 1 ? `${TYPES[item.type].name} needs pull power level ${TYPES[item.type].power}.` : 'Cargo full. Bring your haul to the sell bay below.'); fullWarn = clock + 5;
     }
     const drag = Math.exp(-5 * dt); item.vx *= drag; item.vy *= drag;
     item.x = Math.max(30, Math.min(970, item.x + item.vx * dt)); item.y = Math.max(55, Math.min(525, item.y + item.vy * dt));
@@ -174,7 +191,16 @@ function update(dt) {
       else toast(`Rusty restored: ${state.parts}/5 parts. Keep salvaging!`, 4);
     }
   }
-  spawnTime += dt; if (spawnTime > .15 && scrap.length < 167) { spawn(); spawnTime = 0; }
+  // A yard stays cleared. New piles arrive only when travelling to the next yard.
+  if (!state.recovered && state.yardCleared >= yardFor(state).target && active && Math.hypot(magnet.x - 500, magnet.y - 280) < 95) {
+    wreckCharge += dt;
+    if (wreckCharge >= 2.5 && recoverWreck(state)) {
+      burst(500, 280, yardFor(state).color, 65); shake = 6; tone(1000, .4);
+      labels.push({ x: 500, y: 250, text: 'RECOVERED! +$' + yardFor(state).reward, life: 3 });
+      toast(state.yard === 2 ? 'Expedition complete! Your salvage mech is recovered. Revisit any of the yards by continuing the route.' : 'Wreck recovered! Sell any cargo, then travel to the next yard.', 6);
+      refresh(); save();
+    }
+  } else if (!state.recovered) wreckCharge = Math.max(0, wreckCharge - dt * .5);
   for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
   particles = particles.filter(p => p.life > 0);
   for (const label of labels) { label.y -= dt * 28; label.life -= dt; } labels = labels.filter(l => l.life > 0);
@@ -183,6 +209,24 @@ function update(dt) {
 
 function rounded(x, y, w, h, r, fill, stroke) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); } }
 function text(value, x, y, size = 12, color = '#8fa2a5', align = 'left') { ctx.font = `600 ${size}px "DM Sans", sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(value, x, y); }
+function drawWreck() {
+  const yard = yardFor(state), exposed = state.yardCleared >= yard.target;
+  ctx.save(); ctx.translate(500, 280); ctx.globalAlpha = state.recovered ? .85 : .16 + Math.min(1, state.yardCleared / yard.target) * .6;
+  ctx.lineWidth = 5; ctx.strokeStyle = yard.color;
+  if (state.yard === 0) {
+    for (const x of [-65, 65]) { ctx.beginPath(); ctx.arc(x, 25, 24, 0, 7); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(-65, 25); ctx.lineTo(25, 25); ctx.lineTo(50, -50); ctx.lineTo(30, -50); ctx.moveTo(25, 25); ctx.lineTo(-20, -20); ctx.lineTo(-45, -20); ctx.stroke();
+  } else if (state.yard === 1) {
+    rounded(-100, -55, 125, 70, 15, '#24323b', yard.color); rounded(25, -85, 70, 100, 6, '#24323b', yard.color); rounded(40, -70, 38, 30, 3, null, yard.color); rounded(-70, -85, 20, 30, 2, yard.color);
+    for (const x of [-65, -5, 65]) { ctx.beginPath(); ctx.arc(x, 30, 23, 0, 7); ctx.stroke(); }
+  } else {
+    rounded(-45, -55, 90, 85, 14, '#302b3a', yard.color); rounded(-25, -95, 50, 35, 8, '#302b3a', yard.color);
+    for (const sign of [-1, 1]) { rounded(sign * 70 - 15, -45, 30, 80, 8, '#302b3a', yard.color); rounded(sign * 28 - 12, 35, 24, 55, 5, '#302b3a', yard.color); }
+  }
+  if (exposed && !state.recovered) { ctx.globalAlpha = 1; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 110, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * wreckCharge / 2.5); ctx.stroke(); }
+  ctx.restore();
+  text(state.recovered ? 'RECOVERED · NEXT YARD READY' : exposed ? 'HOLD MAGNET HERE · RECOVER WRECK' : yard.title.toUpperCase(), 500, 400, 13, exposed ? yard.color : '#667d80', 'center');
+}
 function draw() {
   ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#192329'; ctx.fillRect(0, 0, W, H);
   ctx.save();
@@ -194,6 +238,7 @@ function draw() {
   rounded(25, 34, 950, 490, 14, null, '#465148'); ctx.setLineDash([5, 8]); rounded(35, 44, 930, 470, 10, null, '#303c39'); ctx.setLineDash([]);
   for (const x of [50, 950]) { rounded(x - 8, 18, 16, 31, 3, '#596263'); rounded(x - 14, 20, 28, 7, 2, '#d8bd7e'); }
   text('N / 04', 65, 68, 11, '#697873'); text('FERROUS MATERIAL RECOVERY', 935, 68, 10, '#697873', 'right');
+  drawWreck();
   ctx.fillStyle = '#121c20'; ctx.fillRect(0, 539, W, 131);
   for (let x = 10; x < W; x += 30) { if (x > 320 && x < 680) continue; ctx.fillStyle = '#61553b'; ctx.beginPath(); ctx.moveTo(x, 540); ctx.lineTo(x + 12, 540); ctx.lineTo(x - 4, 550); ctx.lineTo(x - 16, 550); ctx.fill(); }
   rounded(337, 552, 326, 94, 9, '#243b34', '#65836b');
@@ -203,7 +248,7 @@ function draw() {
   for (const item of scrap) {
     const type = TYPES[item.type]; ctx.save(); ctx.translate(item.x, item.y); ctx.rotate(item.angle);
     ctx.shadowColor = '#0007'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 4;
-    if (item.type === 2) { rounded(-15, -12, 30, 24, 4, type.color, '#59644f'); ctx.shadowBlur = 0; ctx.fillStyle = '#59644f'; for (let i = -9; i < 12; i += 6) ctx.fillRect(i, -7, 3, 14); }
+    if (item.type >= 2) { const size = item.type === 4 ? 20 : 15; rounded(-size, -12, size * 2, 24, 4, type.color, '#59644f'); ctx.shadowBlur = 0; ctx.fillStyle = '#344651'; for (let i = -9; i < 12; i += 6) ctx.fillRect(i, -7, 3, 14); if (item.type >= 3) { ctx.strokeStyle = '#eef7ff'; ctx.lineWidth = 2; ctx.strokeRect(-size + 3, -8, size * 2 - 6, 16); } }
     else if (item.type === 1) { ctx.strokeStyle = type.color; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0, 0, 9, .4, 5.6); ctx.stroke(); }
     else if (item.shape === 0) { rounded(-11, -5, 22, 10, 2, type.color); ctx.fillStyle = '#56666b'; ctx.fillRect(-7, -2, 14, 2); }
     else if (item.shape === 1) { rounded(-8, -8, 16, 16, 3, type.color); ctx.fillStyle = '#34464a'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, 7); ctx.fill(); }
