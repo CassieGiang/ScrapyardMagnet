@@ -27,9 +27,9 @@ function createGame(initial = null) {
     requestAnimationFrame: fn => nextFrame = fn, HTMLButtonElement: class {},
   };
   const source = readFileSync(new URL('./game.js', import.meta.url), 'utf8').replace(/^import .*;\r?\n/, '');
-  vm.runInNewContext(source, sandbox);
+  vm.createContext(sandbox); vm.runInContext(source, sandbox);
   function frames(n) { for (let i = 0; i < n; i++) { now += 1000 / 60; nextFrame(now); } }
-  return { elements, frames, windowEvents, get saved() { return saved; } };
+  return { elements, frames, windowEvents, get saved() { return saved; }, get scrap() { return JSON.parse(vm.runInContext('JSON.stringify(scrap)', sandbox)); } };
 }
 
 test('game frames collect the starter pile, bank rewards, buy power and recharge blast', () => {
@@ -54,6 +54,19 @@ test('game frames collect the starter pile, bank rewards, buy power and recharge
   windowEvents.blur(); frames(1);
   assert.equal(elements.get('paused').hidden, false);
   assert.equal(blast.disabled, true);
+});
+
+test('travel creates a fully spread yard and cancels an active blast before it can move new scrap', () => {
+  const initial = engine.freshState(); initial.yardCleared = 60; initial.recovered = true; initial.upgrades.power = 1;
+  const game = createGame(initial);
+  game.elements.get('blast').onclick();
+  game.elements.get('next-yard').onclick();
+  assert.equal(game.saved.yard, 1);
+  const before = game.scrap;
+  assert.equal(before.length, engine.YARDS[1].count);
+  assert.ok(before.some(p => p.x < 150)); assert.ok(before.some(p => p.x > 850));
+  game.frames(45);
+  assert.deepEqual(game.scrap, before, 'Fresh scrap stays in its arrival layout until the player pulls');
 });
 
 test('exposed wreck can be recovered in real frames and travel preserves the workshop', () => {

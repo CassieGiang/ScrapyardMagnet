@@ -16,6 +16,23 @@ export const YARDS = [
   { name: 'Reactor ruins', title: 'The sleeping salvage mech', count: 150, target: 100, reward: 1200, color: '#ce9de0', materials: [0, 1, 1, 2, 2, 3, 3, 4] },
 ];
 export function yardFor(state) { return YARDS[state.yard]; }
+export function scatterScrap(count, materials, random = Math.random) {
+  const columns = 12, rows = 8;
+  const cells = Array.from({ length: columns * rows }, (_, i) => i);
+  for (let i = cells.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  return Array.from({ length: count }, (_, i) => {
+    const cell = cells[i % cells.length];
+    return {
+      x: 55 + (cell % columns + .15 + random() * .7) * 890 / columns,
+      y: 75 + (Math.floor(cell / columns) + .15 + random() * .7) * 425 / rows,
+      vx: 0, vy: 0, type: materials[Math.floor(random() * materials.length)],
+      angle: random() * Math.PI * 2, shape: Math.floor(random() * 3),
+    };
+  });
+}
 export function recoverWreck(state) {
   const yard = yardFor(state);
   if (state.recovered || state.yardCleared < yard.target) return false;

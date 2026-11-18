@@ -1,4 +1,4 @@
-import { TYPES, UPGRADES, YARDS, yardFor, recoverWreck, nextYard, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js?v=4';
+import { TYPES, UPGRADES, YARDS, yardFor, scatterScrap, recoverWreck, nextYard, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js?v=5';
 
 const $ = id => document.getElementById(id);
 const canvas = $('yard'), ctx = canvas.getContext('2d');
@@ -39,14 +39,9 @@ function tone(freq = 500, duration = .06, volume = .035) {
     osc.connect(gain); gain.connect(audio.destination); osc.start(); osc.stop(audio.currentTime + duration);
   } catch { sound = false; $('sound').textContent = 'Sound unavailable'; $('sound').setAttribute('aria-pressed', 'false'); }
 }
-function spawn() {
-  const materials = yardFor(state).materials;
-  const type = materials[Math.floor(Math.random() * materials.length)];
-  scrap.push({ x: 70 + Math.random() * 860, y: 85 + Math.random() * 390, vx: 0, vy: 0, type, angle: Math.random() * Math.PI * 2, shape: Math.floor(Math.random() * 3) });
-}
 function populate() {
-  scrap = []; const starter = state.yard === 0 && state.yardCleared === 0 ? 12 : 0;
-  for (let i = 0; i < yardFor(state).count - state.yardCleared - starter; i++) spawn();
+  const starter = state.yard === 0 && state.yardCleared === 0 ? 12 : 0;
+  scrap = scatterScrap(yardFor(state).count - state.yardCleared - starter, yardFor(state).materials);
   // An immediate first cluster lets players feel a full haul before crossing the yard.
   for (let i = 0; i < starter; i++) scrap.push({ x: 440 + i % 4 * 38, y: 420 + Math.floor(i / 4) * 30, vx: 0, vy: 0, type: 0, angle: i, shape: i % 3 });
 }
@@ -94,6 +89,7 @@ function refresh() {
 $('next-yard').onclick = () => {
   if (cargo.length) { toast('Sell your cargo before travelling. Your upgrades come with you.'); return; }
   if (nextYard(state)) {
+    pulling = false; keys.clear(); blastUntil = 0; nextPickupAt = clock;
     part = null; wreckCharge = 0; particles = []; labels = []; magnet = { x: 500, y: 525 }; target = { ...magnet };
     populate(); refresh(); save(); toast(`${yardFor(state).name}: a new wreck, new salvage. Your workshop travels with you.`, 5);
   }

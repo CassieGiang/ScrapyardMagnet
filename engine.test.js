@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshState, restoreState, canCollect, sell, buy, capacity, haulRewards, contractFor, contractProgress, YARDS, yardFor, recoverWreck, nextYard, TYPES, UPGRADES } from './engine.js';
+import { freshState, restoreState, canCollect, sell, buy, capacity, haulRewards, contractFor, contractProgress, YARDS, yardFor, scatterScrap, recoverWreck, nextYard, TYPES, UPGRADES } from './engine.js';
 
 test('complete collect, sell, upgrade loop unlocks heavy scrap', () => {
   const state = freshState(), cargo = [];
@@ -82,6 +82,22 @@ test('rotating contracts fit cargo and only request accessible local materials',
   }
   const restored = restoreState({ yard: 500, yardCleared: 9999, recovered: true });
   assert.equal(restored.yard, 2); assert.equal(restored.yardCleared, 150);
+});
+
+test('new yard layouts cover the full salvage area instead of clustering centrally', () => {
+  for (const yard of YARDS) for (const jitter of [.01, .5, .99]) {
+    const pieces = scatterScrap(yard.count, yard.materials, () => jitter);
+    assert.equal(pieces.length, yard.count);
+    for (const piece of pieces) {
+      assert.ok(piece.x >= 55 && piece.x <= 945 && piece.y >= 75 && piece.y <= 500);
+      assert.ok(yard.materials.includes(piece.type));
+    }
+    for (const left of [true, false]) for (const top of [true, false]) {
+      assert.ok(pieces.filter(p => (p.x < 500) === left && (p.y < 287.5) === top).length >= 15);
+    }
+    assert.ok(pieces.some(p => p.x < 140)); assert.ok(pieces.some(p => p.x > 860));
+    assert.ok(pieces.some(p => p.y < 130)); assert.ok(pieces.some(p => p.y > 440));
+  }
 });
 test('saved progress round-trips and malformed saves cannot break progression', () => {
   const state = freshState(); state.credits = 87; state.parts = 3; state.sold = 51; state.upgrades.range = 2;
