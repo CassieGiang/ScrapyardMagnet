@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121b20">
+  <title>Scrapyard Magnet — One person's junk.</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header><a class="brand" href="./"><span class="brand-icon">∩</span> SCRAPYARD<span>MAGNET</span></a><div class="edition"><i></i> PLAYABLE PROTOTYPE <span> / 001</span></div></header>
+    <section class="intro"><div><p class="eyebrow">JUNK HAS POTENTIAL. SO DO YOU.</p><h1>Find the good stuff.</h1><p>Pull a little scrap. Build something worth keeping.</p></div><div class="balance"><span>YOUR BALANCE</span><strong id="credits">$0</strong></div></section>
+    <div class="layout">
+      <section class="yard-panel" aria-label="Scrapyard game">
+        <div class="panel-head"><span><i></i> NORTH YARD <small> / SALVAGE ZONE</small></span><button id="sound" aria-pressed="false">Sound off</button></div>
+        <div class="canvas-wrap"><canvas id="yard" width="1000" height="670" tabindex="0" aria-label="Move with mouse or arrow keys. Hold click or Space to pull scrap. Move to the bottom sell zone to unload."></canvas><div id="toast" role="status">Welcome to the yard. Hold click to pull scrap.</div><div id="paused" hidden>YARD PAUSED <small>Press P or resume to continue</small></div></div>
+        <div class="cargo"><div><span>CARGO HOLD</span><strong id="cargo">0 / 12</strong></div><div class="track"><div id="cargo-fill"></div></div><span id="haul">$0 haul</span></div>
+        <div class="controls"><span><kbd>HOLD CLICK</kbd> or <kbd>SPACE</kbd> attract</span><span><kbd>WASD / ↑↓←→</kbd> move</span><button id="pause">Pause</button></div>
+      </section>
+      <aside>
+        <section class="workshop"><p class="eyebrow">MAKE EVERY HAUL BETTER</p><h2>The workshop <span>↗</span></h2><div id="upgrades"></div></section>
+        <section class="robot-panel"><div class="robot-heading"><div><p class="eyebrow">SOMETHING TO KEEP</p><h2>Meet Rusty.</h2></div><span id="parts">0 / 5</span></div><svg id="robot" viewBox="0 0 260 160" role="img" aria-label="Rusty the robot restoration progress"><path d="M22 143H238" stroke="#344249"/><g id="robot-parts"></g></svg><p id="robot-copy">Five lost parts. One second chance.<br>Find glowing parts buried in the scrap.</p><div class="track"><div id="robot-fill"></div></div></section>
+        <div class="field-note"><span>FIELD NOTE / 01</span><p>Copper pays more. Engines need a stronger magnet. The sell bay is always open.</p></div>
+      </aside>
+    </div>
+    <footer><span>A SMALL GAME ABOUT BIG POTENTIAL.</span><button id="reset">Start a fresh yard</button><span id="save-status">Progress saved on this device</span></footer>
+  </main>
+  <dialog id="reset-dialog"><h2>Start a fresh yard?</h2><p>This clears your saved credits, upgrades, and robot parts.</p><form method="dialog"><button value="cancel">Keep playing</button><button value="reset" class="danger">Reset progress</button></form></dialog>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
