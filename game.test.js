@@ -31,7 +31,9 @@ test('game frames collect the starter pile, bank rewards, buy power and recharge
   function frames(n) { for (let i = 0; i < n; i++) { now += 1000 / 60; nextFrame(now); } }
   const yard = elements.get('yard');
   yard.events.pointerdown({ button: 0, pointerId: 1, clientX: 500, clientY: 465, preventDefault() {} });
-  frames(90);
+  frames(6);
+  assert.ok(parseInt(elements.get('cargo').textContent) < 6, 'A single click does not instantly fill a haul');
+  frames(84);
   assert.ok(parseInt(elements.get('cargo').textContent) >= 6, 'Starter haul is collected within 1.5 seconds');
   yard.events.pointerup();
   yard.events.pointermove({ clientX: 500, clientY: 610 }); frames(60);

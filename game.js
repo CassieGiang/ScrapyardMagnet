@@ -11,6 +11,7 @@ let magnet = { x: 500, y: 525 }, target = { ...magnet }, pulling = false, paused
 let sound = false, audio, lastTime = 0, clock = 0, spawnTime = 0, toastUntil = 6, fullWarn = 0;
 let part = null, victoryTime = 0;
 let blastUntil = 0, blastReady = 0, shake = 0, lastPickup = -5, streak = 0;
+let nextPickupAt = 0;
 const robotShapes = [
   '<rect x="99" y="74" width="62" height="47" rx="9"/><rect x="112" y="85" width="36" height="20" rx="4"/>',
   '<rect x="104" y="34" width="52" height="36" rx="10"/><path d="M130 34V20"/><circle cx="130" cy="17" r="4"/><circle cx="118" cy="50" r="3" fill="#152127"/><circle cx="142" cy="50" r="3" fill="#152127"/><path d="M120 59H140"/>',
@@ -93,7 +94,7 @@ $('reset').onclick = () => { setPause(true); $('reset-dialog').showModal(); };
 $('reset-dialog').addEventListener('close', () => {
   if ($('reset-dialog').returnValue === 'reset') {
     state = freshState(); cargo = []; particles = []; labels = []; part = null; victoryTime = 0; magnet = { x: 500, y: 525 }; target = { ...magnet };
-    blastUntil = 0; blastReady = 0; shake = 0; streak = 0; lastPickup = -5;
+    blastUntil = 0; blastReady = 0; shake = 0; streak = 0; lastPickup = -5; nextPickupAt = 0;
     $('robot-copy').innerHTML = 'Five lost parts. One second chance.<br>Find glowing parts buried in the scrap.';
     populate(); refresh(); save(); toast('Fresh yard. Fresh possibilities.');
   }
@@ -132,12 +133,13 @@ function update(dt) {
   for (let i = scrap.length - 1; i >= 0; i--) {
     const item = scrap[i], distance = Math.hypot(magnet.x - item.x, magnet.y - item.y);
     if (active && distance < radius && canCollect(state, cargo, item)) {
-      const speed = (700 + state.upgrades.power * 320) * (blasting ? 2.5 : 1);
+      const speed = (180 + state.upgrades.power * 80) * (blasting ? 1.6 : 1);
       const step = Math.min(distance, speed * dt);
       item.x += (magnet.x - item.x) / Math.max(1, distance) * step;
       item.y += (magnet.y - item.y) / Math.max(1, distance) * step;
       item.angle += dt * 4;
-      if (distance - step < 22) {
+      if (distance - step < 22 && clock >= nextPickupAt) {
+        nextPickupAt = clock + (blasting ? .07 : .14);
         cargo.push(item); scrap.splice(i, 1); burst(item.x, item.y, TYPES[item.type].color, 9);
         streak = clock - lastPickup < .8 ? streak + 1 : 1; lastPickup = clock;
         shake = Math.min(4, 1 + streak * .25); tone(440 + Math.min(streak, 16) * 45);
