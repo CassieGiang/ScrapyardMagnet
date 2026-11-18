@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshState, restoreState, canCollect, sell, buy, capacity, haulRewards, contractFor, contractProgress, YARDS, yardFor, scatterScrap, recoverWreck, nextYard, TYPES, UPGRADES } from './engine.js';
+import { freshState, restoreState, canCollect, sell, buy, capacity, haulRewards, contractFor, contractProgress, YARDS, yardFor, scatterScrap, recoverWreck, nextYard, TYPES, UPGRADES, LOCKERS, openLocker } from './engine.js';
 
 test('complete collect, sell, upgrade loop unlocks heavy scrap', () => {
   const state = freshState(), cargo = [];
@@ -105,4 +105,22 @@ test('saved progress round-trips and malformed saves cannot break progression', 
   assert.deepEqual(restoreState(null), freshState());
   const invalid = restoreState({ credits: -10, parts: 99, sold: 'bad', upgrades: { power: 300, capacity: -4 } });
   assert.equal(invalid.credits, 0); assert.equal(invalid.parts, 5); assert.equal(invalid.sold, 0); assert.equal(invalid.upgrades.power, 3); assert.equal(invalid.upgrades.capacity, 0);
+});
+
+test('lockers require clearing, pay once per yard, and finds survive travel and reload', () => {
+  let state = freshState();
+  assert.equal(openLocker(state, 1), false); assert.equal(state.credits, 0);
+  for (let i = 0; i < YARDS.length; i++) {
+    assert.equal(state.yard, i); assert.ok(openLocker(state, 0));
+    const balance = state.credits;
+    assert.equal(openLocker(state, 0), false); assert.equal(state.credits, balance);
+    state = restoreState(JSON.parse(JSON.stringify(state)));
+    assert.equal(state.lockers[i], true);
+    state.yardCleared = yardFor(state).target; recoverWreck(state); nextYard(state);
+  }
+  assert.deepEqual(state.lockers, [true, true, true]); assert.equal(state.yard, 0);
+  assert.equal(openLocker(state, 0), false);
+  assert.equal(LOCKERS.length, 3);
+  assert.deepEqual(restoreState({ lockers: [true, 'true', 1] }).lockers, [true, false, false]);
+  assert.deepEqual(restoreState({ credits: 100 }).lockers, [false, false, false]);
 });

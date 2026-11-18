@@ -4,11 +4,11 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#121b20">
   <title>Scrapyard Magnet — One person's junk.</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <main>
-    <header><a class="brand" href="./"><span class="brand-icon">∩</span> SCRAPYARD<span>MAGNET</span></a><div class="edition"><i></i> PLAYABLE PROTOTYPE <span> / 005</span></div></header>
+    <header><a class="brand" href="./"><span class="brand-icon">∩</span> SCRAPYARD<span>MAGNET</span></a><div class="edition"><i></i> PLAYABLE PROTOTYPE <span> / 006</span></div></header>
     <section class="intro"><div><p class="eyebrow">JUNK HAS POTENTIAL. SO DO YOU.</p><h1>Find the good stuff.</h1><p>Pull a little scrap. Build something worth keeping.</p></div><div class="balance"><span>YOUR BALANCE</span><strong id="credits">$0</strong></div></section>
     <div class="layout">
       <section class="yard-panel" aria-label="Scrapyard game">
@@ -21,13 +21,14 @@
       <aside>
         <section class="expedition"><p class="eyebrow">YOUR SALVAGE EXPEDITION</p><h2 id="expedition-title">The buried scooter</h2><p id="expedition-progress" role="status"></p><div class="track"><div id="yard-fill"></div></div><button id="next-yard" hidden>Travel to next yard →</button></section>
         <section class="workshop"><p class="eyebrow">MAKE EVERY HAUL BETTER</p><h2>The workshop <span>↗</span></h2><div id="upgrades"></div></section>
+        <section class="collection"><div class="robot-heading"><div><p class="eyebrow">HIDDEN IN THE JUNK</p><h2>Keeper's shelf</h2></div><span id="finds">0 / 3</span></div><ul id="collection-list"></ul><p id="locker-hint"></p></section>
         <section class="robot-panel"><div class="robot-heading"><div><p class="eyebrow">SOMETHING TO KEEP</p><h2>Meet Rusty.</h2></div><span id="parts">0 / 5</span></div><svg id="robot" viewBox="0 0 260 160" role="img" aria-label="Rusty the robot restoration progress"><path d="M22 143H238" stroke="#344249"/><g id="robot-parts"></g></svg><p id="robot-copy">Five lost parts. One second chance.<br>Find glowing parts buried in the scrap.</p><div class="track"><div id="robot-fill"></div></div></section>
         <div class="field-note"><span>LEAVE A CLEANER YARD</span><p>Scrap stays cleared. Bank your hauls to expose the buried wreck, then hold your magnet over it to recover it. New yards hold motors and reactor cores. 6 pieces = 1.5× payout; 10 = 2×.</p></div>
       </aside>
     </div>
     <footer><span>A SMALL GAME ABOUT BIG POTENTIAL.</span><button id="reset">Start a fresh yard</button><span id="save-status">Progress saved on this device</span></footer>
   </main>
-  <dialog id="reset-dialog"><h2>Start a fresh yard?</h2><p>This clears your saved credits, upgrades, and robot parts.</p><form method="dialog"><button value="cancel">Keep playing</button><button value="reset" class="danger">Reset progress</button></form></dialog>
-  <script type="module" src="game.js?v=5"></script>
+  <dialog id="reset-dialog"><h2>Start a fresh yard?</h2><p>This clears your saved credits, upgrades, robot parts, and collected finds.</p><form method="dialog"><button value="cancel">Keep playing</button><button value="reset" class="danger">Reset progress</button></form></dialog>
+  <script type="module" src="game.js?v=6"></script>
 </body>
 </html>

@@ -16,6 +16,17 @@ export const YARDS = [
   { name: 'Reactor ruins', title: 'The sleeping salvage mech', count: 150, target: 100, reward: 1200, color: '#ce9de0', materials: [0, 1, 1, 2, 2, 3, 3, 4] },
 ];
 export function yardFor(state) { return YARDS[state.yard]; }
+export const LOCKERS = [
+  { x: 200, y: 220, find: 'Vintage camera', reward: 75, color: '#e1bf79' },
+  { x: 800, y: 190, find: 'Lost radio', reward: 125, color: '#8cbfda' },
+  { x: 200, y: 220, find: 'Pocket drone', reward: 200, color: '#ce9de0' },
+];
+export function openLocker(state, nearbyScrap) {
+  if (state.lockers[state.yard] || nearbyScrap > 0) return false;
+  state.lockers[state.yard] = true;
+  state.credits += LOCKERS[state.yard].reward;
+  return true;
+}
 export function scatterScrap(count, materials, random = Math.random) {
   const columns = 12, rows = 8;
   const cells = Array.from({ length: columns * rows }, (_, i) => i);
@@ -48,7 +59,7 @@ export const CONTRACTS = [
   { name: 'Heavy metal', type: 2, count: 2, reward: 60 },
   { name: 'Clean sweep', type: null, count: 15, reward: 80 },
 ];
-export function freshState() { return { credits: 0, parts: 0, sold: 0, contracts: 0, yard: 0, yardCleared: 0, recovered: false, upgrades: { power: 0, range: 0, capacity: 0 } }; }
+export function freshState() { return { credits: 0, parts: 0, sold: 0, contracts: 0, yard: 0, yardCleared: 0, recovered: false, lockers: [false, false, false], upgrades: { power: 0, range: 0, capacity: 0 } }; }
 export function contractFor(state) {
   if (state.contracts < 3) return CONTRACTS[state.contracts];
   const available = [...new Set(yardFor(state).materials)].filter(type => TYPES[type].power <= state.upgrades.power + 1);
@@ -78,5 +89,6 @@ export function restoreState(raw) {
   if (Number.isInteger(raw.yard)) s.yard = Math.max(0, Math.min(YARDS.length - 1, raw.yard));
   if (Number.isSafeInteger(raw.yardCleared)) s.yardCleared = Math.max(0, Math.min(yardFor(s).count, raw.yardCleared));
   s.recovered = raw.recovered === true && s.yardCleared >= yardFor(s).target;
+  s.lockers = LOCKERS.map((_, i) => raw.lockers?.[i] === true);
   return s;
 }

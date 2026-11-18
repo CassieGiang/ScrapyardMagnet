@@ -90,3 +90,30 @@ test('exposed wreck can be recovered in real frames and travel preserves the wor
   assert.match(elements.get('yard-name').textContent, /RAIL DEPOT/);
   frames(200); assert.equal(game.saved.credits, credits, 'Recovered wreck cannot pay twice');
 });
+
+test('clear locker door opens from the marked circle, reveals a saved find and pays once', () => {
+  const initial = engine.freshState(); initial.yardCleared = engine.YARDS[0].count;
+  const game = createGame(initial), { elements, frames } = game;
+  const yard = elements.get('yard'), locker = engine.LOCKERS[0];
+  yard.events.pointerdown({ button: 0, pointerId: 1, clientX: locker.x, clientY: locker.y, preventDefault() {} });
+  frames(150);
+  assert.equal(game.saved.lockers[0], false, 'Standing on the locker does not pry its door');
+  yard.events.pointermove({ clientX: locker.x + 85, clientY: locker.y });
+  frames(150);
+  assert.equal(game.saved.lockers[0], true); assert.equal(game.saved.credits, locker.reward);
+  assert.equal(elements.get('finds').textContent, '1 / 3');
+  assert.match(elements.get('collection-list').innerHTML, /Vintage camera/);
+  frames(150); assert.equal(game.saved.credits, locker.reward);
+  const reloaded = createGame(game.saved); reloaded.frames(1);
+  assert.equal(reloaded.saved.lockers[0], true);
+  assert.equal(reloaded.elements.get('finds').textContent, '1 / 3');
+});
+
+test('sealed locker starts with approachable cover scrap and cannot instantly open', () => {
+  const game = createGame(), locker = engine.LOCKERS[0];
+  const cover = game.scrap.filter(p => Math.hypot(p.x - locker.x, p.y - locker.y) < 72);
+  assert.ok(cover.length >= 6); assert.ok(cover.every(p => p.type === 0));
+  game.elements.get('yard').events.pointerdown({ button: 0, pointerId: 1, clientX: locker.x + 85, clientY: locker.y, preventDefault() {} });
+  game.frames(6);
+  assert.equal(game.saved.lockers[0], false); assert.equal(game.saved.credits, 0);
+});

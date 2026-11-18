@@ -26,6 +26,7 @@ If PowerShell blocks `npm.ps1`, use `node server.js` directly or `npm.cmd start`
 
 ## Controls
 
+- Each yard has a sealed locker. Clear scrap within its marked area, then hold click or Space with the magnet in the circle to the right for 1.6 seconds. Its door slides open to reveal a collectible and bank a cash reward. The camera, radio, and drone are kept on the Keeper's shelf; each locker pays only once, including on repeat expeditions.
 - Explore three finite yards: North yard, Rail depot, and Reactor ruins. Scrap stays cleared. Bank enough pieces to expose each yard's wreck, then hold your magnet over its center for 2.5 seconds to recover it and claim the cash reward. Sell any remaining cargo before travelling.
 - Travel preserves credits, workshop upgrades, and Rusty's parts. Yard progress saves when cargo is sold; unbanked cargo is returned to the pile on reload. After the third wreck, the route can be replayed.
 - Motors require pull power level 3; reactor cores require level 4. Later upgrades cost more, while the first purchases remain affordable. Existing saves keep their purchased upgrades.

@@ -1,4 +1,4 @@
-import { TYPES, UPGRADES, YARDS, yardFor, scatterScrap, recoverWreck, nextYard, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js?v=5';
+import { TYPES, UPGRADES, YARDS, LOCKERS, openLocker, yardFor, scatterScrap, recoverWreck, nextYard, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js?v=6';
 
 const $ = id => document.getElementById(id);
 const canvas = $('yard'), ctx = canvas.getContext('2d');
@@ -13,6 +13,7 @@ let part = null, victoryTime = 0;
 let blastUntil = 0, blastReady = 0, shake = 0, lastPickup = -5, streak = 0;
 let nextPickupAt = 0;
 let wreckCharge = 0;
+let lockerCharge = 0, revealUntil = 0;
 const robotShapes = [
   '<rect x="99" y="74" width="62" height="47" rx="9"/><rect x="112" y="85" width="36" height="20" rx="4"/>',
   '<rect x="104" y="34" width="52" height="36" rx="10"/><path d="M130 34V20"/><circle cx="130" cy="17" r="4"/><circle cx="118" cy="50" r="3" fill="#152127"/><circle cx="142" cy="50" r="3" fill="#152127"/><path d="M120 59H140"/>',
@@ -44,7 +45,15 @@ function populate() {
   scrap = scatterScrap(yardFor(state).count - state.yardCleared - starter, yardFor(state).materials);
   // An immediate first cluster lets players feel a full haul before crossing the yard.
   for (let i = 0; i < starter; i++) scrap.push({ x: 440 + i % 4 * 38, y: 420 + Math.floor(i / 4) * 30, vx: 0, vy: 0, type: 0, angle: i, shape: i % 3 });
+  const locker = LOCKERS[state.yard];
+  if (!state.lockers[state.yard]) {
+    // Keep the door approachable at every power level. Cover pieces count as ordinary yard scrap.
+    for (const item of scrap) if (Math.hypot(item.x - locker.x, item.y - locker.y) < 80) item.type = 0;
+    const cover = Math.min(6, Math.max(0, 6 - Math.floor(state.yardCleared / 3)), scrap.length - starter);
+    for (let i = 0; i < cover; i++) Object.assign(scrap[i], { x: locker.x - 38 + (i % 3) * 38, y: locker.y - 20 + Math.floor(i / 3) * 40, type: 0 });
+  }
 }
+function nearbyLockerScrap() { const locker = LOCKERS[state.yard]; return scrap.filter(item => Math.hypot(item.x - locker.x, item.y - locker.y) < 72).length; }
 function fieldRadius() { return [110, 160, 215, 275][state.upgrades.range]; }
 function blast() {
   if (paused || !state.upgrades.power || clock < blastReady) return;
@@ -66,6 +75,9 @@ function refresh() {
   $('next-yard').hidden = !state.recovered;
   $('next-yard').textContent = state.yard === YARDS.length - 1 ? 'Expedition complete · revisit North yard ↻' : 'Travel to ' + YARDS[state.yard + 1].name + ' →';
   $('credits').textContent = '$' + state.credits;
+  $('finds').textContent = state.lockers.filter(Boolean).length + ' / 3';
+  $('collection-list').innerHTML = LOCKERS.map((locker, i) => `<li class="${state.lockers[i] ? 'found' : ''}"><span>${state.lockers[i] ? '◆' : '◇'}</span> ${state.lockers[i] ? locker.find : 'Undiscovered · ' + YARDS[i].name}</li>`).join('');
+  $('locker-hint').textContent = state.lockers[state.yard] ? 'Find kept in your collection. Explore the next yard for another.' : 'Find the sealed locker. Clear its surroundings, then pull its door from the marked circle on the right.';
   $('cargo').textContent = `${cargoWeight(cargo)} / ${capacity(state)} kg`;
   $('cargo-fill').style.width = `${cargoWeight(cargo) / capacity(state) * 100}%`;
   const reward = haulRewards(state, cargo), job = contractFor(state);
@@ -90,7 +102,7 @@ $('next-yard').onclick = () => {
   if (cargo.length) { toast('Sell your cargo before travelling. Your upgrades come with you.'); return; }
   if (nextYard(state)) {
     pulling = false; keys.clear(); blastUntil = 0; nextPickupAt = clock;
-    part = null; wreckCharge = 0; particles = []; labels = []; magnet = { x: 500, y: 525 }; target = { ...magnet };
+    part = null; wreckCharge = 0; lockerCharge = 0; revealUntil = 0; particles = []; labels = []; magnet = { x: 500, y: 525 }; target = { ...magnet };
     populate(); refresh(); save(); toast(`${yardFor(state).name}: a new wreck, new salvage. Your workshop travels with you.`, 5);
   }
 };
@@ -107,7 +119,7 @@ $('reset').onclick = () => { setPause(true); $('reset-dialog').showModal(); };
 $('reset-dialog').addEventListener('close', () => {
   if ($('reset-dialog').returnValue === 'reset') {
     state = freshState(); cargo = []; particles = []; labels = []; part = null; victoryTime = 0; magnet = { x: 500, y: 525 }; target = { ...magnet };
-    blastUntil = 0; blastReady = 0; shake = 0; streak = 0; lastPickup = -5; nextPickupAt = 0; wreckCharge = 0;
+    blastUntil = 0; blastReady = 0; shake = 0; streak = 0; lastPickup = -5; nextPickupAt = 0; wreckCharge = 0; lockerCharge = 0; revealUntil = 0;
     $('robot-copy').innerHTML = 'Five lost parts. One second chance.<br>Find glowing parts buried in the scrap.';
     populate(); refresh(); save(); toast('Fresh yard. Fresh possibilities.');
   }
@@ -197,6 +209,16 @@ function update(dt) {
       refresh(); save();
     }
   } else if (!state.recovered) wreckCharge = Math.max(0, wreckCharge - dt * .5);
+  const locker = LOCKERS[state.yard];
+  if (!state.lockers[state.yard] && (pulling || keys.has(' ')) && nearbyLockerScrap() === 0 && Math.hypot(magnet.x - locker.x - 85, magnet.y - locker.y) < 42) {
+    lockerCharge = Math.min(1.6, lockerCharge + dt);
+    if (lockerCharge >= 1.6 && openLocker(state, nearbyLockerScrap())) {
+      revealUntil = clock + 5; shake = 5; burst(locker.x, locker.y, locker.color, 40); tone(1100, .35);
+      labels.push({ x: locker.x, y: locker.y - 80, text: locker.find.toUpperCase(), life: 3 });
+      toast(`FOUND: ${locker.find}! Kept in your collection, plus $${locker.reward} banked.`, 6);
+      refresh(); save();
+    }
+  } else if (!state.lockers[state.yard]) lockerCharge = Math.max(0, lockerCharge - dt * .6);
   for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
   particles = particles.filter(p => p.life > 0);
   for (const label of labels) { label.y -= dt * 28; label.life -= dt; } labels = labels.filter(l => l.life > 0);
@@ -205,6 +227,31 @@ function update(dt) {
 
 function rounded(x, y, w, h, r, fill, stroke) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); } }
 function text(value, x, y, size = 12, color = '#8fa2a5', align = 'left') { ctx.font = `600 ${size}px "DM Sans", sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(value, x, y); }
+function drawLocker() {
+  const locker = LOCKERS[state.yard], opened = state.lockers[state.yard];
+  const progress = opened ? 1 : lockerCharge / 1.6, blockers = nearbyLockerScrap();
+  ctx.save(); ctx.translate(locker.x, locker.y);
+  rounded(-34, -42, 68, 84, 5, '#111c21', '#a07856');
+  if (opened) {
+    ctx.strokeStyle = locker.color; ctx.lineWidth = 3;
+    if (state.yard === 0) { rounded(-22, -13, 44, 30, 4, '#59676b', locker.color); rounded(-15, -20, 14, 7, 1, locker.color); ctx.beginPath(); ctx.arc(4, 2, 10, 0, 7); ctx.stroke(); }
+    else if (state.yard === 1) { rounded(-23, -16, 46, 36, 4, '#3c5960', locker.color); ctx.beginPath(); ctx.moveTo(12, -16); ctx.lineTo(22, -32); ctx.stroke(); for (let x = -16; x < 4; x += 6) { ctx.beginPath(); ctx.moveTo(x, -8); ctx.lineTo(x, 10); ctx.stroke(); } }
+    else { rounded(-12, -10, 24, 20, 4, '#574369', locker.color); for (const x of [-20, 20]) for (const y of [-20, 20]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.ellipse(x, y, 12, 4, 0, 0, 7); ctx.stroke(); } }
+  }
+  ctx.save(); ctx.translate(progress * 72, 0); ctx.scale(1 - progress * .75, 1);
+  rounded(-31, -39, 62, 78, 4, '#654c3d', '#ba926d');
+  rounded(14, -6, 5, 18, 2, '#d8bf92');
+  for (let y = -27; y < -9; y += 6) { ctx.fillStyle = '#302d28'; ctx.fillRect(-18, y, 32, 2); }
+  ctx.restore();
+  if (!opened && blockers === 0) {
+    ctx.strokeStyle = locker.color; ctx.lineWidth = 2; ctx.setLineDash([4, 5]); ctx.beginPath(); ctx.moveTo(35 + progress * 50, 0); ctx.lineTo(85, 0); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(85, 0, 25, 0, 7); ctx.stroke(); text('→', 85, 7, 22, locker.color, 'center');
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 53, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2); ctx.stroke();
+  }
+  text(opened ? locker.find.toUpperCase() : blockers ? `SEALED LOCKER · CLEAR ${blockers}` : 'HOLD IN CIRCLE → PULL OPEN', 0, 66, 10, opened ? locker.color : '#dbc7a1', 'center');
+  if (clock < revealUntil) { ctx.globalAlpha = Math.max(0, Math.min(1, revealUntil - clock)); text('FIND KEPT  +$' + locker.reward, 0, -62, 15, locker.color, 'center'); }
+  ctx.restore();
+}
 function drawWreck() {
   const yard = yardFor(state), exposed = state.yardCleared >= yard.target;
   ctx.save(); ctx.translate(500, 280); ctx.globalAlpha = state.recovered ? .85 : .16 + Math.min(1, state.yardCleared / yard.target) * .6;
@@ -235,6 +282,7 @@ function draw() {
   for (const x of [50, 950]) { rounded(x - 8, 18, 16, 31, 3, '#596263'); rounded(x - 14, 20, 28, 7, 2, '#d8bd7e'); }
   text('N / 04', 65, 68, 11, '#697873'); text('FERROUS MATERIAL RECOVERY', 935, 68, 10, '#697873', 'right');
   drawWreck();
+  drawLocker();
   ctx.fillStyle = '#121c20'; ctx.fillRect(0, 539, W, 131);
   for (let x = 10; x < W; x += 30) { if (x > 320 && x < 680) continue; ctx.fillStyle = '#61553b'; ctx.beginPath(); ctx.moveTo(x, 540); ctx.lineTo(x + 12, 540); ctx.lineTo(x - 4, 550); ctx.lineTo(x - 16, 550); ctx.fill(); }
   rounded(337, 552, 326, 94, 9, '#243b34', '#65836b');
