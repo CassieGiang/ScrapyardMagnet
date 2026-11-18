@@ -26,6 +26,9 @@ If PowerShell blocks `npm.ps1`, use `node server.js` directly or `npm.cmd start`
 
 ## Controls
 
+- Salvage jobs pay bonus cash for bringing the requested cargo in a single haul. The first six-piece delivery pays at least $38, enough for the first power upgrade.
+- Bring 6 pieces for a 1.5× scrap payout, or 10 for 2×. Job bonuses are added after the multiplier.
+- The first power upgrade unlocks Magnetic Blast: press E or the Blast button to pull from a much larger area for a short burst. It recharges in seven seconds; higher power levels strengthen it.
 - Move the pointer to steer; hold the primary mouse button to attract scrap.
 - Touch: drag and hold to move and attract.
 - Keyboard: WASD / arrow keys to move, Space to attract, P to pause.
@@ -42,7 +45,7 @@ Credits, upgrades, and restored parts save automatically in this browser. Cargo 
 node --test
 ```
 
-Tests cover the collection/selling/upgrade loop, cargo weight limits, heavy-scrap unlocking, upgrade limits, and saved-state validation.
+Tests cover the collection/selling/upgrade loop, job rewards, cargo weight limits, heavy-scrap unlocking, upgrade limits, saved-state migration, and simulated game frames for the first haul and blast cooldown. Frame tests use a minimal DOM/canvas stub; they do not replace a visual browser playtest.
 
 ## Scope
 

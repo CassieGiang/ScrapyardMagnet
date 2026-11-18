@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshState, restoreState, canCollect, sell, buy, capacity } from './engine.js';
+import { freshState, restoreState, canCollect, sell, buy, capacity, haulRewards, contractFor, contractProgress } from './engine.js';
 
 test('complete collect, sell, upgrade loop unlocks heavy scrap', () => {
   const state = freshState(), cargo = [];
@@ -8,12 +8,34 @@ test('complete collect, sell, upgrade loop unlocks heavy scrap', () => {
   for (let trip = 0; trip < 2; trip++) {
     for (let i = 0; i < 12; i++) { assert.ok(canCollect(state, cargo, { type: 0 })); cargo.push({ type: 0 }); }
     assert.equal(canCollect(state, cargo, { type: 0 }), false);
-    assert.equal(sell(state, cargo), 24); assert.equal(cargo.length, 0);
+    assert.equal(sell(state, cargo), trip === 0 ? 68 : 48); assert.equal(cargo.length, 0);
   }
-  assert.equal(state.credits, 48); assert.equal(state.sold, 24);
-  assert.ok(buy(state, 'power')); assert.equal(state.credits, 18);
+  assert.equal(state.credits, 116); assert.equal(state.sold, 24);
+  assert.ok(buy(state, 'power')); assert.equal(state.credits, 96);
   assert.ok(canCollect(state, cargo, { type: 2 }));
-  assert.equal(buy(state, 'capacity'), false); assert.equal(state.credits, 18);
+  state.credits = 19;
+  assert.equal(buy(state, 'capacity'), false); assert.equal(state.credits, 19);
+});
+
+test('first six-piece haul buys a real upgrade and job bonus is paid once', () => {
+  const state = freshState(), cargo = Array.from({ length: 6 }, () => ({ type: 0 }));
+  assert.deepEqual(haulRewards(state, cargo), { base: 12, multiplier: 1.5, bonus: 20, total: 38 });
+  assert.equal(sell(state, cargo), 38); assert.equal(state.contracts, 1);
+  assert.ok(buy(state, 'power')); assert.ok(canCollect(state, [], { type: 2 }));
+  assert.equal(sell(state, []), 0); assert.equal(state.contracts, 1);
+  assert.equal(contractFor(state).name, 'Copper rush');
+});
+
+test('jobs require matching cargo in one haul; completed jobs survive reload', () => {
+  const state = freshState(); state.contracts = 1;
+  const mixed = [{ type: 1 }, { type: 1 }, { type: 0 }];
+  assert.equal(contractProgress(state, mixed), 2); assert.equal(haulRewards(state, mixed).bonus, 0);
+  sell(state, mixed); assert.equal(state.contracts, 1);
+  assert.equal(sell(state, [{ type: 1 }, { type: 1 }, { type: 1 }]), 50);
+  assert.equal(restoreState(state).contracts, 2);
+  assert.equal(restoreState({ credits: 40, upgrades: {} }).contracts, 0);
+  state.contracts = 99;
+  assert.equal(contractFor(state).name, 'Clean sweep');
 });
 test('mixed cargo respects weight, and upgrades cannot exceed maximum', () => {
   const state = freshState(); state.credits = 1000;
