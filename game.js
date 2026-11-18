@@ -1,4 +1,4 @@
-import { TYPES, UPGRADES, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js';
+import { TYPES, UPGRADES, freshState, restoreState, capacity, cargoWeight, haulRewards, contractFor, contractProgress, canCollect, sell, buy } from './engine.js?v=2';
 
 const $ = id => document.getElementById(id);
 const canvas = $('yard'), ctx = canvas.getContext('2d');
