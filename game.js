@@ -130,7 +130,7 @@ function pointer(event) {
   target.x = Math.max(25, Math.min(975, (event.clientX - rect.left) * W / rect.width));
   target.y = Math.max(50, Math.min(630, (event.clientY - rect.top) * H / rect.height));
 }
-canvas.addEventListener('pointerdown', e => { if (e.button !== 0 || paused) return; e.preventDefault(); canvas.focus(); pointer(e); pulling = true; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerdown', e => { if (e.button !== 0 || paused) return; e.preventDefault(); canvas.focus({ preventScroll: true }); pointer(e); pulling = true; canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', pointer);
 canvas.addEventListener('pointerup', () => pulling = false);
 canvas.addEventListener('pointercancel', () => pulling = false);

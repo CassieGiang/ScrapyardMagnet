@@ -11,7 +11,7 @@ function createGame(initial = null) {
   function element() {
     return { style: {}, classList: { toggle() {} }, events: {}, textContent: '', disabled: false,
       addEventListener(name, fn) { this.events[name] = fn; }, setAttribute() {},
-      append(button) { elements.set(button.id, button); }, focus() {}, setPointerCapture() {},
+      append(button) { elements.set(button.id, button); }, focus(options) { this.focusOptions = options; }, setPointerCapture() {},
       getBoundingClientRect() { return { left: 0, top: 0, width: 1000, height: 670 }; },
     };
   }
@@ -36,6 +36,7 @@ test('game frames collect the starter pile, bank rewards, buy power and recharge
   const game = createGame(), { elements, frames, windowEvents } = game;
   const yard = elements.get('yard');
   yard.events.pointerdown({ button: 0, pointerId: 1, clientX: 500, clientY: 465, preventDefault() {} });
+  assert.equal(yard.focusOptions.preventScroll, true, 'Clicking the yard must not move the page under the pointer');
   frames(6);
   assert.ok(parseInt(elements.get('cargo').textContent) < 6, 'A single click does not instantly fill a haul');
   frames(84);
